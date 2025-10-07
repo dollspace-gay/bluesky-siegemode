@@ -1,0 +1,7 @@
+Flask
+atproto
+APScheduler
+requests
+requests_oauth2client
+gunicorn
+playwright

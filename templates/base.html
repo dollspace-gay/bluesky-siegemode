@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bluesky Siege Mode</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background-color: #f0f2f5; }
+        .container { max-width: 800px; margin: 2rem auto; padding: 2rem; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        h1 { color: #1d9bf0; }
+        .btn { display: inline-block; padding: 10px 20px; background-color: #1d9bf0; color: #fff; text-decoration: none; border-radius: 5px; }
+        .form-group { margin-bottom: 1rem; }
+        label { display: block; margin-bottom: 0.5rem; }
+        input[type="text"], input[type="number"] { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        .alert { padding: 1rem; margin-bottom: 1rem; border-radius: 4px; }
+        .alert-info { background-color: #e2f3fe; color: #0c5460; border: 1px solid #bde5fb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bluesky Siege Mode</h1>
+        {% block content %}{% endblock %}
+    </div>
+</body>
+</html>

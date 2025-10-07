@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    {% if session.get('did') %}
+        <p>Welcome, <strong>{{ session['did'] }}</strong>! You are now logged in.</p>
+        <hr>
+        <h2>Engage Siege Mode</h2>
+        <form action="/siege" method="post">
+            <div class="form-group">
+                <label for="post_url">Bluesky Post URL:</label>
+                <input type="text" id="post_url" name="post_url" required placeholder="https://bsky.app/profile/user.bsky.social/post/3k...">
+            </div>
+            <div class="form-group">
+                <label for="duration">Duration (in hours):</label>
+                <input type="number" id="duration" name="duration" min="1" max="72" value="24" required>
+            </div>
+            <button type="submit" class="btn">Activate Siege Mode</button>
+        </form>
+        <p><a href="/logout">Logout</a></p>
+    {% else %}
+        <div class="alert alert-info">
+            Welcome to Bluesky Siege Mode. Please log in to continue.
+        </div>
+        <a href="/login" class="btn">Login with Bluesky</a>
+    {% endif %}
+{% endblock %}

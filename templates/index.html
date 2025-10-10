@@ -11,6 +11,11 @@
 
     {% if session.get('did') %}
         <p>Welcome, <strong>{{ session['did'] }}</strong>! You are now logged in.</p>
+        {% if unread_count is not none %}
+            <p>
+                <a href="/notifications" class="btn">Notifications{% if unread_count %} ({{ unread_count }}){% endif %}</a>
+            </p>
+        {% endif %}
         <hr>
         <h2>Engage Siege Mode</h2>
         <form action="/siege" method="post">

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h2>Notifications{% if unread_count %} ({{ unread_count }} unread){% endif %}</h2>
+
+    <form action="/notifications/mark-seen" method="post" style="margin-bottom: 1rem;">
+        <input type="hidden" name="seen_at" value="">
+        <button type="submit" class="btn">Mark all as seen</button>
+    </form>
+
+    {% if notifications|length == 0 %}
+        <div class="alert alert-info">No notifications.</div>
+    {% else %}
+        <ul>
+            {% for n in notifications %}
+                <li>
+                    <div>
+                        <strong>{{ n.reason }}</strong>
+                        by {{ n.author.displayName or n.author.handle }}
+                        <div style="color: #666; font-size: 0.9em;">{{ n.indexedAt }}</div>
+                        {% if n.reasonSubject %}
+                            <div>Subject: {{ n.reasonSubject }}</div>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+        <div style="margin-top: 1rem;">
+            {% if cursor %}
+                <a class="btn" href="/notifications?limit={{ limit }}&cursor={{ cursor }}">Load more</a>
+            {% endif %}
+        </div>
+    {% endif %}
+{% endblock %}

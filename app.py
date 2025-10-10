@@ -68,7 +68,36 @@ def client_metadata():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    """Home page. If logged in, also show unread notifications count."""
+    unread_count = None
+    if session.get('token'):
+        try:
+            token = BearerToken(**session['token'])
+            auth = OAuth2AccessTokenAuth(token)
+            resp = requests.get(
+                f"{AUTHORIZATION_SERVER}/xrpc/app.bsky.notification.getUnreadCount",
+                auth=auth,
+                timeout=HTTP_TIMEOUT_SECONDS,
+            )
+            # If token expired, try to refresh once
+            if resp.status_code == 401 and session['token'].get('refresh_token'):
+                try:
+                    new_token = oauth_client.refresh_token(session['token']['refresh_token'])
+                    new_token_dict = new_token.dict()
+                    session['token'].update(new_token_dict)
+                    auth = OAuth2AccessTokenAuth(BearerToken(**new_token_dict))
+                    resp = requests.get(
+                        f"{AUTHORIZATION_SERVER}/xrpc/app.bsky.notification.getUnreadCount",
+                        auth=auth,
+                        timeout=HTTP_TIMEOUT_SECONDS,
+                    )
+                except Exception as refresh_err:
+                    logger.warning("Unread count refresh failed: %s", refresh_err)
+            if resp.ok:
+                unread_count = resp.json().get('count', None)
+        except Exception as e:
+            logger.warning("Failed to fetch unread count: %s", e)
+    return render_template('index.html', unread_count=unread_count)
 
 @app.route('/login')
 def login():
@@ -229,6 +258,115 @@ def unsiege_threadgate(user_did, token_dict, post_rkey):
         logger.info("Successfully removed threadgate for %s on post %s", user_did, post_rkey)
     except Exception as e:
         logger.exception("Error in unsiege_threadgate job: %s", e)
+
+
+@app.route('/notifications')
+def notifications_page():
+    """Notifications UI page with pagination and mark-as-seen action."""
+    if 'token' not in session:
+        return redirect(url_for('login'))
+
+    limit = request.args.get('limit', default=30, type=int)
+    if limit < 1:
+        limit = 1
+    if limit > 100:
+        limit = 100
+    cursor = request.args.get('cursor', default=None, type=str)
+
+    token = BearerToken(**session['token'])
+    auth = OAuth2AccessTokenAuth(token)
+
+    params = {'limit': limit}
+    if cursor:
+        params['cursor'] = cursor
+
+    # List notifications
+    list_resp = requests.get(
+        f"{AUTHORIZATION_SERVER}/xrpc/app.bsky.notification.listNotifications",
+        params=params,
+        auth=auth,
+        timeout=HTTP_TIMEOUT_SECONDS,
+    )
+    if list_resp.status_code == 401 and session['token'].get('refresh_token'):
+        try:
+            new_token = oauth_client.refresh_token(session['token']['refresh_token'])
+            new_token_dict = new_token.dict()
+            session['token'].update(new_token_dict)
+            auth = OAuth2AccessTokenAuth(BearerToken(**new_token_dict))
+            list_resp = requests.get(
+                f"{AUTHORIZATION_SERVER}/xrpc/app.bsky.notification.listNotifications",
+                params=params,
+                auth=auth,
+                timeout=HTTP_TIMEOUT_SECONDS,
+            )
+        except Exception as refresh_err:
+            logger.warning("Token refresh failed during notifications list: %s", refresh_err)
+    list_resp.raise_for_status()
+    notif_data = list_resp.json()
+
+    # Unread count for header
+    unread_resp = requests.get(
+        f"{AUTHORIZATION_SERVER}/xrpc/app.bsky.notification.getUnreadCount",
+        auth=auth,
+        timeout=HTTP_TIMEOUT_SECONDS,
+    )
+    if unread_resp.ok:
+        unread_count = unread_resp.json().get('count', 0)
+    else:
+        unread_count = 0
+
+    return render_template(
+        'notifications.html',
+        notifications=notif_data.get('notifications', []),
+        cursor=notif_data.get('cursor'),
+        viewer_seen_at=notif_data.get('seenAt'),
+        limit=limit,
+        unread_count=unread_count,
+    )
+
+
+@app.route('/notifications/mark-seen', methods=['POST'])
+def notifications_mark_seen():
+    """Mark all notifications as seen at the provided or current time."""
+    if 'token' not in session:
+        return redirect(url_for('login'))
+
+    seen_at = request.form.get('seen_at')
+    if not seen_at:
+        seen_at = datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+    token = BearerToken(**session['token'])
+    auth = OAuth2AccessTokenAuth(token)
+
+    payload = {'seenAt': seen_at}
+    resp = requests.post(
+        f"{AUTHORIZATION_SERVER}/xrpc/app.bsky.notification.updateSeen",
+        json=payload,
+        auth=auth,
+        timeout=HTTP_TIMEOUT_SECONDS,
+    )
+    if resp.status_code == 401 and session['token'].get('refresh_token'):
+        try:
+            new_token = oauth_client.refresh_token(session['token']['refresh_token'])
+            new_token_dict = new_token.dict()
+            session['token'].update(new_token_dict)
+            auth = OAuth2AccessTokenAuth(BearerToken(**new_token_dict))
+            resp = requests.post(
+                f"{AUTHORIZATION_SERVER}/xrpc/app.bsky.notification.updateSeen",
+                json=payload,
+                auth=auth,
+                timeout=HTTP_TIMEOUT_SECONDS,
+            )
+        except Exception as refresh_err:
+            logger.warning("Token refresh failed during updateSeen: %s", refresh_err)
+
+    try:
+        resp.raise_for_status()
+        flash("Marked notifications as seen.", "info")
+    except Exception as e:
+        logger.warning("Failed to mark notifications as seen: %s", e)
+        flash("Failed to mark notifications as seen.", "error")
+    return redirect(url_for('notifications_page'))
 
 @app.route('/siege', methods=['POST'])
 def siege():

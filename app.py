@@ -9,6 +9,8 @@ from urllib.parse import urlparse
 import requests
 from datetime import datetime, timezone, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
+from db import init_db
+from xrpc_blueprint import xrpc_bp
 
 # For a real application, use a secure way to generate and store this key.
 # It should be a long, random string and kept secret.
@@ -31,7 +33,7 @@ app.config.update(
 Session(app)
 
 # CSRF protection for all POST requests
-CSRFProtect(app)
+csrf = CSRFProtect(app)
 
 # In a real app, you would likely get this from a config file or environment variables.
 CLIENT_ID = os.environ.get('CLIENT_ID', "http://127.0.0.1:5000/oauth/client-metadata.json")
@@ -50,6 +52,15 @@ oauth_client = OAuth2Client(
 )
 
 scheduler = BackgroundScheduler()
+
+# Initialize DB and register blueprints
+init_db()
+app.register_blueprint(xrpc_bp, url_prefix='/xrpc')
+try:
+    # XRPC is machine-to-machine; exempt for simplicity here
+    csrf.exempt(xrpc_bp)
+except Exception:
+    pass
 
 @app.route('/oauth/client-metadata.json')
 def client_metadata():
